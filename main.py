@@ -1,121 +1,57 @@
 import telebot
-import webbrowser
-import sqlite3
+from currency_converter import CurrencyConverter
 from telebot import types
 
 bot = telebot.TeleBot('6519856683:AAHy5KDNzXzSF_Fj83a7SzNZbzoP9eYKjOA')
-name = None
+currency = CurrencyConverter()
+amount = 0
 
 @bot.message_handler(commands=['start'])
 
 def start(message):
-    markup = types.ReplyKeyboardMarkup()
-    btn1 = types.KeyboardButton("Перейти на сайт")
-    markup.row(btn1)
-    btn2 = types.KeyboardButton('Удалить фото')
-    btn3 = types.KeyboardButton('Изменить текст')
-    markup.row(btn2, btn3)
-    file = open('./da.png', 'rb')
-    bot.send_photo(message.chat.id, file, reply_markup=markup)
-    #bot.send_message(message.chat.id, 'Привет' ,reply_markup=markup)
-    #bot.send_audio(message.chat.id, file.mp3, reply_markup=markup)
-    #bot.send_vidio(message.chat.id, file.mp4, reply_markup=markup)
-    bot.register_next_step_handler(message, on_click)\
+    bot.send_message(message.chat.id,'Введите сумму')
+    bot.register_next_step_handler(message, summa)
 
-def on_click(message):
-    if message.text == 'Перейти на сайт':
-        bot.send_message(message.chat.id,'web_site')
-    elif message.text == 'Удалить фото':
-        bot.send_message(message.chat.id, 'Delete')
+def summa(message):
+    global amount
+    try:
+        amount = int(message.text.strip())
+    except ValueError:
+        bot.send_message(message.chat.id, 'Неверный формат. Дай цифры жи есть')
+        bot.register_next_step_handler(message,summa)
+        return
 
-
-@bot.message_handler(commands=['baza'])
-
-def baza(message):
-    conn = sqlite3.connect('baza.sql')
-    cur = conn.cursor()
-
-    cur.execute("CREATE TABLE IF NOT EXISTS users(id int auto_increment primary key, name varchar(50), pass varchar(50))")
-    conn.commit()
-    cur.close()
-    conn.close()
-
-    bot.send_message(message.chat.id,'Здорово уебок, как тебя зовут?')
-    bot.register_next_step_handler(message, user_name)
-
-def user_name(message):
-    global name
-    name = message.text.strip()
-    bot.send_message(message.chat.id, 'Введи пароль блядота')
-    bot.register_next_step_handler(message, user_pass)
-
-def user_pass(message):
-    password = message.text.strip()
-    conn = sqlite3.connect('baza.sql')
-    cur = conn.cursor()
-
-    cur.execute("INSERT INTO users(name, pass) VALUES('%s', '%s')" %(name, password))
-    conn.commit()
-    cur.close()
-    conn.close()
-
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton('Список уебков', callback_data='users'))
-    bot.send_message(message.chat.id, 'Congratulations!',reply_markup=markup)
-    #bot.register_next_step_handler(message,user_pass)
-
+    if amount > 0:
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        btn1 = types.InlineKeyboardButton('USD/EUR', callback_data='usd/eur')
+        btn2 = types.InlineKeyboardButton('EUR/USD', callback_data='eur/usd')
+        btn3 = types.InlineKeyboardButton('USD/CNY', callback_data='usd/cny')
+        btn4 = types.InlineKeyboardButton('Другое значение', callback_data='else')
+        markup.add(btn1,btn2,btn3,btn4)
+        bot.send_message(message.chat.id,'Выбери пару валют',reply_markup=markup)
+    else:
+        bot.send_message(message.chat.id, 'Еблан? введи число больше 0')
+        bot.register_next_step_handler(message, summa)
 
 @bot.callback_query_handler(func=lambda call: True)
-
 def call_back(call):
-    conn = sqlite3.connect('baza.sql')
-    cur = conn.cursor()
+    if call.data != 'else':
+        values = call.data.upper().split('/')
+        res = currency.convert(amount,values[0], values[1])
+        bot.send_message(call.message.chat.id, f'Получается: {round(res, 2)} Впиши еще')
+        bot.register_next_step_handler(call.message, summa)
+    else:
+        bot.send_message(call.message.chat.id, 'Введи через /')
+        bot.register_next_step_handler(call.message, my_currency)
 
-    cur.execute("SELECT * FROM users")
-    users = cur.fetchall()
-    info = ''
-
-    for el in users:
-        info += f'Имя: {el[1]}, Пароль: {el[2]} \n'
-
-
-    cur.close()
-    conn.close()
-
-    bot.send_message(call.message.chat.id, info)
-
-
-@bot.message_handler(commands=['site','website'])
-
-def site(message):
-    webbrowser.open('https://www.youtube.com')
-
-
-
-@bot.message_handler(commands=['help'])
-
-def main(message):
-    bot.send_message(message.chat.id, 'Help information')
-
-
-@bot.message_handler()
-def info(message):
-    if message.text.lower() == 'привет':
-        bot.send_message(message.chat.id, f'Привет,{message.from_user.first_name}')
-    elif message.text.lower() == 'id':
-        bot.reply_to(message, f'ID:{message.from_user.id}')
-
-@bot.message_handler(content_types=['photo'])
-def get_photo(message):
-    markup = types.InlineKeyboardMarkup()
-    btn1 = types.InlineKeyboardButton("Перейти на сайт", url="https://www.youtube.com")
-    markup.row(btn1)
-    btn2 = types.InlineKeyboardButton('Удалить фото',callback_data='delete')
-    btn3 = types.InlineKeyboardButton('Изменить текст',callback_data='edit')
-    markup.row(btn2,btn3)
-    bot.reply_to(message,'Зачет',reply_markup=markup)
-
-
-
+def my_currency(message):
+    try:
+        values = message.text.upper().split('/')
+        res = currency.convert(amount, values[0], values[1])
+        bot.send_message(message.chat.id, f'Получается: {round(res, 2)} Впиши еще')
+        bot.register_next_step_handler(message, summa)
+    except Exception:
+        bot.send_message(message.chat.id, 'Еблан? впиши нормально')
+        bot.register_next_step_handler(message, my_currency)
 
 bot.polling(none_stop=True)
