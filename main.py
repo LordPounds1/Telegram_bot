@@ -26,8 +26,10 @@ def summa(message):
         btn1 = types.InlineKeyboardButton('USD/EUR', callback_data='usd/eur')
         btn2 = types.InlineKeyboardButton('EUR/USD', callback_data='eur/usd')
         btn3 = types.InlineKeyboardButton('USD/CNY', callback_data='usd/cny')
+        btn5 = types.InlineKeyboardButton('RUB/INR',callback_data='rub/inr')
+        btn6 = types.InlineKeyboardButton('INR/RUB',callback_data='inr/rub')
         btn4 = types.InlineKeyboardButton('Другое значение', callback_data='else')
-        markup.add(btn1,btn2,btn3,btn4)
+        markup.add(btn1,btn2,btn3,btn4,btn5,btn6)
         bot.send_message(message.chat.id,'Выбери пару валют',reply_markup=markup)
     else:
         bot.send_message(message.chat.id, 'Еблан? введи число больше 0')
